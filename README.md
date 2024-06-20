@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Image Optimization + Correct Src Paths for Nextjs Static Builds on GitHub Pages
 
-## Getting Started
+That's a long winded title, I know. Essentially, the story is this.
+I created a Nestjs Static (Generated / Exported / Whatever) Application for a client and wanted to host it using GitHub Pages.
+The site was super simple, so didn't need SSR or Edge Functions or any of the extra stuff you get with a Nextjs Application.
 
-First, run the development server:
+There are some solutions out there to 'solve' this but most are a half baked solve crammed into an NPM Package.
+Rather than do the same thing but maybe slightly better, I just created some stuff and built a minimal reproduction of what I did.
+The purpose of this is to give you, the reader, something that you can copy paste into your project, and easily modify if necessary.
+The reality is that this requirement is so simple, you really don't need a another dependency with more dependencies and more dependencies still... You really just need get on with it and write some code (or just copy mine).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Understanding the problems
+
+### Nextjs
+
+Lets start at the application. Nextjs uses image optimization by default, using built in (bundled) libs. However, those don't work with Static Exports. Why? Probably just not a priority to make that work. <br/>
+
+### GitHub Pages
+
+The second part of this issue is not necessarily GitHub's issue, in fairness it's Nextjs not respecting `basePath` in config. <br/>
+What does that mean though? Essentially, GitHub Pages hosts on both a subdomain, and a route. <br/>
+When you publish to GitHub Pages, the URL created looks something like this.<br/>
+https://your-username-or-org-name.github.io/repo-name
+<br/>
+To make your site load on GitHub Pages, you set this in your next.config.js|mjs file, OR you just let the workflow from the GitHub Action found here [actions/configure-pages@v5](https://github.com/actions/configure-pages) do it for you.
+
+``` mjs
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  basePath: "/repo-name",
+};
+
+export default nextConfig;
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The issue this causes is such: when you source images locally (from your /public/ folder for example), you would reference it like this
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```ts
+<Image src="/myImage.jpg" ... />
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+BUT, when your site is published, you notice that your images aren't loaded. Upon inspecting the now HTML \<img /> tags, and adding '/repo-name' to the start, they magically work. Surely, setting a basePath in your next.config.js would be respected by the `<Image />` primative right?
+Oh you sweet summer child, Triangle Company doesn't care about your Statically Exported Nextjs Site you want to host on GitHub.
+<br/>
 
-## Learn More
+## The Simple 'Fix'
 
-To learn more about Next.js, take a look at the following resources:
+<b>Just turn off Image Optimization, right?</b><br/>
+Sure, if you want to do that. Go ahead. Here's the Config to do so.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+``` mjs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  basePath: "/<repo-name>",
+  images: {
+    unoptimized: true,
+  },
+};
 
-## Deploy on Vercel
+export default nextConfig;
+```
+<br/>
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+## Actually Fixing it
+
+There are three main components to resolving this issue. 
+
+- Image Optimization Script
+- Custom Loader
+- Higher Order Component for `<Image />`
+
